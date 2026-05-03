@@ -1,6 +1,6 @@
 # create-t3-app
 
-A Claude skill (Cowork / Claude Code) that scaffolds a fully-working T3 stack project with a local Postgres dev DB. Run it in an empty directory and end up with a Next.js + tRPC + Drizzle + better-auth project where `npm run app` Just Works — no Docker, no cloud database, no extra config.
+A Claude skill (Claude Code) that scaffolds a fully-working T3 stack project with a local Postgres dev DB. Run it in an empty directory and end up with a Next.js + tRPC + Drizzle + better-auth project where `npm run app` Just Works — no Docker, no cloud database, no extra config.
 
 ## The stack (opinionated, no toggles)
 
