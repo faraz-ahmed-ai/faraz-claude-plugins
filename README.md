@@ -36,9 +36,9 @@ If your organization manages plugins centrally, an admin may need to add the mar
 
 ### create-t3-app-local
 
-Zero-input local install of an opinionated [T3 stack](https://create.t3.gg/) — **Next.js App Router, TypeScript, Tailwind CSS, tRPC, Drizzle ORM, and better-auth** — wired to a self-contained [PGlite](https://pglite.dev/) Postgres daemon for development. No external services, no Docker, no database to provision: `npm run app` starts the local DB and the dev server in one shot.
+Zero-input local install of an opinionated [T3 stack](https://create.t3.gg/) — **Next.js App Router, TypeScript, Tailwind CSS, tRPC, Drizzle ORM, and better-auth** — wired to a shared local Postgres (Homebrew `postgresql@16`, auto-started by your OS) with a per-project isolated database and least-privilege roles. No Docker, no manual DB setup, no external services: `npm run dev` is all you need.
 
-The skill installs Node and Git via Homebrew if they are missing, scaffolds the project, applies a curated set of post-scaffold fixes (peer dependency bumps, env schema relaxations, table prefix alignment, drizzle-kit filter corrections), drops in a PGlite daemon plus launch scripts, generates a fresh `BETTER_AUTH_SECRET`, pushes the schema, and verifies the dev server returns HTTP 200 — all without prompting the user.
+The skill installs Node, Git, Homebrew, and `postgresql@16` if any are missing; scaffolds the project; applies a curated set of post-scaffold fixes (peer dependency bumps, env schema relaxations, table prefix alignment, drizzle-kit filter corrections); provisions an isolated database with random per-project role passwords; registers a `t3-local-pg` MCP server with Claude Desktop / Cowork so any session can query each project's database; pins the project name in `CLAUDE.md` for automatic disambiguation; pushes the schema; and verifies the dev server returns HTTP 200 — all without prompting the user.
 
 Trigger phrasings: *"set up a new t3 app"*, *"scaffold a t3 stack"*, *"bootstrap create-t3-app"*, *"/create-t3-app"*.
 
@@ -65,6 +65,9 @@ See [`setup-claude-md-index/README.md`](./setup-claude-md-index/README.md) for d
 │   ├── .claude-plugin/
 │   │   └── plugin.json               # plugin manifest
 │   ├── README.md                     # plugin docs
+│   ├── mcp-server/                   # source for the project-aware MCP server
+│   │   ├── package.json
+│   │   └── server.js
 │   └── skills/
 │       └── create-t3-app-local/
 │           └── SKILL.md              # skill definition + procedure
