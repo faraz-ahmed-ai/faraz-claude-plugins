@@ -14,6 +14,7 @@ Then install any plugin from the catalog below:
 
 ```
 /plugin install create-t3-app-local@faraz-claude-plugins
+/plugin install setup-claude-md-index@faraz-claude-plugins
 ```
 
 ### Claude Desktop (Cowork)
@@ -40,20 +41,39 @@ Trigger phrasings: *"set up a new t3 app"*, *"scaffold a t3 stack"*, *"bootstrap
 
 See [`create-t3-app-local/README.md`](./create-t3-app-local/README.md) for details.
 
+### setup-claude-md-index
+
+Scaffold a `CLAUDE.md` file in the current folder as a **strict index** pointing to per-topic detail files in `.claude/topics/`. The generated `CLAUDE.md` carries rules forbidding inline topic content, the index entry format, kebab-case filename conventions, and maintenance guidance for when to add, split, merge, or update topics. If a `CLAUDE.md` already exists with content, the skill migrates each `##` section into its own `.claude/topics/<slug>.md` file (small stubs are collected into `misc.md`) and rewrites `CLAUDE.md` as an index pointing to them.
+
+The goal is to keep `CLAUDE.md` small and discoverable: an index Claude can scan quickly to find the right topic file to load, instead of an unbounded knowledge dump that grows expensive to load and noisy to read.
+
+Trigger phrasings: *"set up CLAUDE.md"*, *"create a CLAUDE.md"*, *"initialize CLAUDE.md"*, *"scaffold a CLAUDE.md index"*, *"convert CLAUDE.md to an index"*.
+
+See [`setup-claude-md-index/README.md`](./setup-claude-md-index/README.md) for details.
+
 ## Repository layout
 
 ```
 .
 ├── .claude-plugin/
-│   └── marketplace.json          # marketplace manifest
-├── README.md                     # this file
-└── create-t3-app-local/          # plugin
+│   └── marketplace.json              # marketplace manifest
+├── README.md                         # this file
+├── create-t3-app-local/              # plugin
+│   ├── .claude-plugin/
+│   │   └── plugin.json               # plugin manifest
+│   ├── README.md                     # plugin docs
+│   └── skills/
+│       └── create-t3-app-local/
+│           └── SKILL.md              # skill definition + procedure
+└── setup-claude-md-index/            # plugin
     ├── .claude-plugin/
-    │   └── plugin.json           # plugin manifest
-    ├── README.md                 # plugin docs
+    │   └── plugin.json               # plugin manifest
+    ├── README.md                     # plugin docs
     └── skills/
-        └── create-t3-app-local/
-            └── SKILL.md          # skill definition + procedure
+        └── setup-claude-md-index/
+            ├── SKILL.md              # skill definition + procedure
+            └── references/
+                └── claude-md-template.md  # CLAUDE.md template body
 ```
 
 ## Adding a new plugin

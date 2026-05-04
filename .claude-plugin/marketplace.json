@@ -14,6 +14,12 @@
       "source": "./create-t3-app-local",
       "version": "1.0.0",
       "description": "Zero-input local install of an opinionated T3 stack (Next.js App Router, TypeScript, Tailwind, tRPC, Drizzle, better-auth) backed by a self-contained PGlite dev database. No external services, no manual prompts — runs end-to-end on macOS or Linux."
+    },
+    {
+      "name": "setup-claude-md-index",
+      "source": "./setup-claude-md-index",
+      "version": "1.0.0",
+      "description": "Scaffold CLAUDE.md in the current folder as a strict index pointing to per-topic detail files in .claude/topics/. Enforces an index-only CLAUDE.md with rules for adding, splitting, and merging topics; migrates any existing inline content into topic files."
     }
   ]
 }

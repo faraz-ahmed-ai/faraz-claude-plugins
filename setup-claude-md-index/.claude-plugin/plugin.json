@@ -1,0 +1,10 @@
+{
+  "name": "setup-claude-md-index",
+  "version": "1.0.0",
+  "description": "Scaffold CLAUDE.md as a strict index in the current folder, with per-topic detail files in .claude/topics/. Migrates inline content into topic files when CLAUDE.md already exists.",
+  "author": {
+    "name": "Faraz",
+    "email": "faraz@pocketpulse.io"
+  },
+  "skills": ["./skills/setup-claude-md-index"]
+}
