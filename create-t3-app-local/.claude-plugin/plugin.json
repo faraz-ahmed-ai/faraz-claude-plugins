@@ -1,0 +1,10 @@
+{
+  "name": "create-t3-app-local",
+  "version": "1.0.0",
+  "description": "Zero-input local install of an opinionated T3 stack (Next.js App Router, TypeScript, Tailwind, tRPC, Drizzle, better-auth) wired to a self-contained PGlite dev database — runs end-to-end on macOS or Linux with no external services.",
+  "author": {
+    "name": "Faraz",
+    "email": "faraz@pocketpulse.io"
+  },
+  "skills": ["./skills/create-t3-app-local"]
+}

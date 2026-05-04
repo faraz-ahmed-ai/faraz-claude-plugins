@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "faraz-claude-plugins",
+  "version": "1.0.0",
+  "description": "Faraz's personal Claude Code plugin marketplace — opinionated plugins for spinning up dev environments, scaffolding stacks, and automating local-first workflows.",
+  "owner": {
+    "name": "Faraz",
+    "email": "faraz@pocketpulse.io",
+    "url": "https://github.com/faraz-ahmed-ai"
+  },
+  "plugins": [
+    {
+      "name": "create-t3-app-local",
+      "source": "./create-t3-app-local",
+      "version": "1.0.0",
+      "description": "Zero-input local install of an opinionated T3 stack (Next.js App Router, TypeScript, Tailwind, tRPC, Drizzle, better-auth) backed by a self-contained PGlite dev database. No external services, no manual prompts — runs end-to-end on macOS or Linux."
+    }
+  ]
+}

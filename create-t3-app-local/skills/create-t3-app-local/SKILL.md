@@ -1,9 +1,9 @@
 ---
-name: create-t3-app
+name: create-t3-app-local
 description: Scaffold a fresh T3 stack project (Next.js App Router + TypeScript + Tailwind + tRPC + Drizzle + better-auth) with a self-contained local Postgres dev DB (PGlite running as a daemon) and an `npm run app` command that starts the DB, pushes the schema, and runs the dev server. Takes no arguments — fully ready to go. Trigger this whenever the user asks to set up, scaffold, bootstrap, or initialize a new T3 app, T3 stack, or create-t3-app project — including phrasings like "start a new t3 project", "spin up a t3 stack", or "/create-t3-app".
 ---
 
-# create-t3-app
+# create-t3-app-local
 
 Scaffolds a T3 app in the current directory, applies a curated set of fixes, and wires up a local PGlite daemon so the dev environment runs end-to-end with no external services. Production database and credentials are deferred to deployment time.
 
