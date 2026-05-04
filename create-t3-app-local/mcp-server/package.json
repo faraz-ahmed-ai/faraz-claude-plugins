@@ -1,0 +1,17 @@
+{
+  "name": "t3-local-pg-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that exposes locally-registered T3 app databases to Claude Desktop and Cowork.",
+  "type": "module",
+  "main": "server.js",
+  "bin": {
+    "t3-local-pg-mcp": "server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "pg": "^8.13.1"
+  }
+}
