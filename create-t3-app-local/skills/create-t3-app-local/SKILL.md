@@ -667,6 +667,32 @@ NODESCRIPT
 
 After this step the MCP server's next call (Claude Desktop / Cowork) will see the new project — the server reads the registry on every tool invocation.
 
+**f. Pin the project name in `CLAUDE.md`.**
+
+The MCP server requires an explicit `project` argument on every tool call — it does not infer the project from the working directory. Writing the slug into the project's `CLAUDE.md` lets any Claude session opened in this repo resolve the right project name automatically, without a preliminary `list_projects` lookup and without ambiguity when more than one T3 app is registered.
+
+```bash
+CLAUDE_MD="CLAUDE.md"
+PIN_MARKER="## Local database (t3-local-pg)"
+
+if ! { [ -f "$CLAUDE_MD" ] && grep -qF "$PIN_MARKER" "$CLAUDE_MD"; }; then
+  # Ensure existing file ends with a blank-line separator before appending.
+  if [ -f "$CLAUDE_MD" ] && [ -s "$CLAUDE_MD" ]; then
+    [ -n "$(tail -c 1 "$CLAUDE_MD")" ] && printf '\n' >> "$CLAUDE_MD"
+    printf '\n' >> "$CLAUDE_MD"
+  fi
+  cat >> "$CLAUDE_MD" <<EOF
+$PIN_MARKER
+
+This project is registered with the \`t3-local-pg\` MCP server as **\`$SLUG\`**. Pass this name as the \`project\` argument when calling \`query\`, \`query_write\`, \`describe\`, or \`list_projects\`.
+EOF
+fi
+```
+
+The `grep -qF` check makes this idempotent: re-running the skill on a project that already has the section leaves `CLAUDE.md` untouched. If the user manually rewrote the section with a different slug (unusual — would only happen if they hand-edited the registry too), the skill respects their edit and does not overwrite it.
+
+The new file (or appended section) is picked up by Step 8d's `git add .` along with everything else, so the pin lands in the same staged tree as the rest of the scaffold.
+
 ### 8. Verify the stack
 
 Three things to verify, in order. The first scaffold needs an explicit one-time `db:push` to create the schema; after that, the user runs push themselves whenever they edit the schema.
@@ -741,7 +767,7 @@ After every preceding step succeeded, print exactly the block below — verbatim
 - `npm run dev` — start the dev server (Postgres runs in the background as a system service)
 - `npm run db:push` — apply schema changes after editing `src/server/db/schema.ts`
 - Database registry: `~/.t3-local-pg/registry.json` (project name → DB connection URLs)
-- MCP server: `t3-local-pg` is registered with Claude Desktop / Cowork. Use the `query`, `query_write`, `describe`, and `list_projects` tools to inspect this project's DB.
+- MCP server: `t3-local-pg` is registered with Claude Desktop / Cowork. Use the `query`, `query_write`, `describe`, and `list_projects` tools to inspect this project's DB. The project name is pinned in `CLAUDE.md` so any Claude session opened here resolves it automatically.
 ```
 
 If `npm run dev` bound to a non-3000 port during Step 8b, append exactly one line: `Dev server is on port <N> (something else was on :3000).`
