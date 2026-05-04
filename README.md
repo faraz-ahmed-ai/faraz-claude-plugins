@@ -14,6 +14,9 @@ Then install any plugin from the catalog below:
 
 ```
 /plugin install create-t3-app-local@faraz-claude-plugins
+```
+
+```
 /plugin install setup-claude-md-index@faraz-claude-plugins
 ```
 
