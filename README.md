@@ -4,7 +4,7 @@ A personal [Claude Code](https://docs.claude.com/en/docs/claude-code) plugin mar
 
 ## Installing the marketplace
 
-In Claude Code:
+### Claude Code (CLI)
 
 ```
 /plugin marketplace add faraz-ahmed-ai/faraz-claude-plugins
@@ -15,6 +15,18 @@ Then install any plugin from the catalog below:
 ```
 /plugin install create-t3-app-local@faraz-claude-plugins
 ```
+
+### Claude Desktop (Cowork)
+
+The `/plugin` slash command is Claude Code only. In Claude Desktop, add the marketplace through the UI:
+
+1. Open Claude Desktop and switch to the **Cowork** tab.
+2. Click **Customize** in the left sidebar.
+3. Click **Add plugin** (or the **+** button) and choose **GitHub** as the source.
+4. Enter `faraz-ahmed-ai/faraz-claude-plugins` (in `owner/repo` format) and confirm.
+5. Once the marketplace syncs, install individual plugins (e.g. `create-t3-app-local`) from the same Customize menu.
+
+If your organization manages plugins centrally, an admin may need to add the marketplace under **Organization Settings → Plugins** instead.
 
 ## Plugins
 
