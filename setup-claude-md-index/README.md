@@ -7,13 +7,13 @@ A Cowork plugin with a single skill that scaffolds a `CLAUDE.md` file in the cur
 When you run the `setup-claude-md-index` skill in a project folder, Claude will:
 
 1. Create `.claude/topics/` if it does not exist.
-2. Write `CLAUDE.md` at the root with:
+2. **If `CLAUDE.md` does not exist (fresh setup):** invoke the built-in `/init` command first so Claude analyzes the repository and writes a populated `CLAUDE.md`. The skill then runs migration on that generated file (step 3 below) so the index structure is layered on top of real, codebase-derived content rather than an empty stub.
+3. **If `CLAUDE.md` exists with content (migration):** migrate each `##` section into its own topic file (small stubs are collected into `misc.md`), then rewrite `CLAUDE.md` as an index with:
    - Rules forbidding inline topic content
    - The index entry format spec
    - Filename conventions for topic files
    - Maintenance rules (when to add, split, merge, update)
-   - The index itself (initially empty)
-3. If `CLAUDE.md` already exists with content, migrate each `##` section into its own topic file (small stubs are collected into `misc.md`), then rewrite `CLAUDE.md` as an index pointing to them.
+   - The index pointing to the extracted topic files
 
 ## Why
 

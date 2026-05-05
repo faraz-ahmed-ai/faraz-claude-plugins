@@ -14,7 +14,8 @@ A working [create-t3-app](https://create.t3.gg/) project pre-configured with:
 - **better-auth** (with GitHub OAuth env vars made optional so the project boots without provisioning OAuth credentials)
 - **ESLint + Prettier**
 - **A per-project Postgres database** (`<slug>_dev`) inside a shared Homebrew `postgresql@16` cluster — auto-started on login via `brew services` (launchd on macOS, systemd-user on Linux). Each project gets its own database and its own least-privilege roles, so projects can't read or corrupt each other's data.
-- **A `t3-local-pg` MCP server**, registered with Claude Desktop and Cowork, exposing `query`, `query_write`, `describe`, and `list_projects` tools so Claude can inspect each project's database directly. The current project's slug is auto-pinned in `CLAUDE.md` so any session opened in the repo resolves to the right database without a lookup.
+- **A `t3-local-pg` MCP server**, registered with Claude Desktop and Cowork, exposing `query`, `query_write`, `describe`, and `list_projects` tools so Claude can inspect each project's database directly. The current project's slug is auto-pinned via the strict-index `CLAUDE.md` (see next bullet) so any session opened in the repo resolves to the right database without a lookup.
+- **An indexed `CLAUDE.md`.** As the final scaffold step, the skill runs the built-in `/init` to populate `CLAUDE.md` with codebase-derived architecture context, appends the MCP database section, then runs an inline migration that converts the result into a strict index pointing to per-topic detail files in `.claude/topics/` (`local-database.md` for MCP usage, plus topic files for architecture, build/test commands, etc.). Future Claude sessions opening the repo see the index, follow the entries, and load only the topic files they need. The migration is fully self-contained — no dependency on other plugins.
 
 …and the standard create-t3-app scripts. The two you'll use most:
 
@@ -67,7 +68,7 @@ The skill takes no arguments. When it finishes, you'll see a short success repor
 - `npm run dev` — start the dev server (Postgres runs in the background as a system service)
 - `npm run db:push` — apply schema changes after editing `src/server/db/schema.ts`
 - Database registry: `~/.t3-local-pg/registry.json` (project name → DB connection URLs)
-- MCP server: `t3-local-pg` is registered with Claude Desktop / Cowork. Use the `query`, `query_write`, `describe`, and `list_projects` tools to inspect this project's DB. The project name is pinned in `CLAUDE.md` so any Claude session opened here resolves it automatically.
+- MCP server: `t3-local-pg` is registered with Claude Desktop / Cowork. Use the `query`, `query_write`, `describe`, and `list_projects` tools to inspect this project's DB. Project context lives in `CLAUDE.md` (a strict index) and `.claude/topics/*.md` — the MCP slug and usage rules are in `.claude/topics/local-database.md`, architecture and build notes are in their own topic files. Any Claude session opened here resolves the project automatically via the index.
 ```
 
 All changes are staged in git (the scaffold runs `git init && git add .` early; the skill re-stages after applying its post-scaffold fixes). Commit when ready:
@@ -107,7 +108,9 @@ create-t3-app-local/
 │   └── server.js
 └── skills/
     └── create-t3-app-local/
-        └── SKILL.md           # the skill itself — full procedure, edge cases, recovery
+        ├── SKILL.md           # the skill itself — full procedure, edge cases, recovery
+        └── references/
+            └── claude-md-template.md  # template for the indexed CLAUDE.md (used by substep 7f.iii)
 ```
 
 The full procedure (every edge case the skill handles internally — dotfile stash, ERESOLVE iterations, port-detection fallback, registry collision suffixing, idempotent re-runs) lives in [`skills/create-t3-app-local/SKILL.md`](./skills/create-t3-app-local/SKILL.md).

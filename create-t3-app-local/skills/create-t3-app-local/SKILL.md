@@ -24,13 +24,14 @@ During execution, the only chat output is **one short success line per component
 - `Post-scaffold fixes applied`
 - `Database provisioned`
 - `.env configured`
+- `CLAUDE.md indexed` (skip entirely if substep 7f's idempotency check found `.claude/topics/local-database.md` already present and skipped the bootstrap)
 - `Schema pushed`
 - `Dev server verified`
 - `Changes staged`
 
 Then print the "## How to use" block from Step 9. Nothing else.
 
-**Do not** narrate intermediate progress, echo tool results, paste scaffold/install logs, comment on ERESOLVE iterations, list each post-scaffold edit, or summarize the stack. Internal recovery (dotfile stash, ERESOLVE peer bumps, port-detection fallback, registry conflict suffixing, Claude Desktop config patching, marker-file recovery) is invisible — these are expected paths, not events to report. The user does not need to see `npm install` output, `git status`, `find` output, or any "Now running…" preamble.
+**Do not** narrate intermediate progress, echo tool results, paste scaffold/install logs, comment on ERESOLVE iterations, list each post-scaffold edit, or summarize the stack. Internal recovery (dotfile stash, ERESOLVE peer bumps, port-detection fallback, registry conflict suffixing, Claude Desktop config patching, marker-file recovery, the `/init` invocation in substep 7f.i, the inline index migration in substep 7f.iii) is invisible — these are expected paths, not events to report. The user does not need to see `npm install` output, `git status`, `find` output, the topic files written by the index migration, or any "Now running…" preamble.
 
 **Unexpected errors are the exception** — and the only exception. If something fails outside the documented expected paths (a third ERESOLVE iteration involving an unrelated package, scaffold artifacts missing after Step 4, postgres refusing to accept connections after start, HTTP probe returning non-200, etc.), stop and surface the actual error verbatim. Do not continue past the failure and do not claim success. "Expected" means a path explicitly described in the relevant step; everything else is unexpected.
 
@@ -614,22 +615,40 @@ NODESCRIPT
 
 After this step the MCP server's next call (Claude Desktop / Cowork) will see the new project — the server reads the registry on every tool invocation.
 
-**f. Pin the project name in `CLAUDE.md` and route data questions through the MCP server.**
+**f. Bootstrap `CLAUDE.md` with `/init`, the MCP pin, and the strict-index conversion.**
 
-The MCP server requires an explicit `project` argument on every tool call — it does not infer the project from the working directory. Pinning the slug in `CLAUDE.md` lets any Claude session opened in this repo resolve the right project name automatically, without a preliminary `list_projects` lookup and without ambiguity when more than one T3 app is registered. The same section also carries explicit guidance that any data-shaped question (row values, counts, schema lookups) must go through the MCP tools rather than through code-reading or shell `psql` calls — the host's Postgres on `127.0.0.1:5432` is not reachable from sandboxed bash environments (Cowork, Claude Code), so the MCP server is the only path.
+This bundles three sub-actions: run `/init` to populate `CLAUDE.md` with codebase-derived architecture context, append the MCP database pin, then convert the whole thing into the strict-index structure via inline migration. The whole substep is self-contained — substep f.i invokes the built-in `/init` skill (always available in Claude Code), and substeps f.ii and f.iii operate entirely on local files using procedures defined inline below and a template at `references/claude-md-template.md` next to this SKILL.md. There is no dependency on any other plugin.
+
+The end state is `CLAUDE.md` as a pure index, with `.claude/topics/local-database.md` carrying MCP usage and per-architecture topic files (`architecture.md`, `project-overview.md`, etc.) carrying `/init`'s output. Future Claude sessions opening this repo see the index, follow the entries, and load the relevant topic files on demand.
+
+The MCP server requires an explicit `project` argument on every tool call — it does not infer the project from the working directory. The pin lets any Claude session resolve the right slug automatically, without a preliminary `list_projects` lookup. The same topic also carries explicit guidance that any data-shaped question (row values, counts, schema lookups) must go through the MCP tools rather than through code-reading or shell `psql` calls — the host's Postgres on `127.0.0.1:5432` is not reachable from sandboxed bash environments (Cowork, Claude Code), so the MCP server is the only path.
+
+**Idempotency for the entire substep.** Use `.claude/topics/local-database.md` as the canonical "already bootstrapped" signal. If that file exists, skip all three sub-actions below — the project is already set up.
 
 ```bash
-CLAUDE_MD="CLAUDE.md"
-PIN_MARKER="## Local database (t3-local-pg)"
+if [ -f .claude/topics/local-database.md ]; then
+  echo "CLAUDE.md already bootstrapped — skipping init, pin, and indexing"
+  CLAUDE_BOOTSTRAP_SKIPPED=1
+fi
+```
 
-if ! { [ -f "$CLAUDE_MD" ] && grep -qF "$PIN_MARKER" "$CLAUDE_MD"; }; then
-  # Ensure existing file ends with a blank-line separator before appending.
-  if [ -f "$CLAUDE_MD" ] && [ -s "$CLAUDE_MD" ]; then
-    [ -n "$(tail -c 1 "$CLAUDE_MD")" ] && printf '\n' >> "$CLAUDE_MD"
-    printf '\n' >> "$CLAUDE_MD"
-  fi
-  cat >> "$CLAUDE_MD" <<EOF
-$PIN_MARKER
+If `CLAUDE_BOOTSTRAP_SKIPPED=1` is set, skip the three sub-actions below and proceed directly to Step 8 (`db:push` and dev-server verification). Otherwise:
+
+**f.i — Run the built-in `/init`.** Invoke the `init` skill via the Skill tool: `{"skill": "init"}`. This is the same logic as the user typing `/init` — Claude analyzes the just-scaffolded T3 project and writes a populated `CLAUDE.md` at the project root with sections like `## Project Overview`, `## Architecture`, `## Build & Test Commands`, etc. Wait for the skill to finish and verify `CLAUDE.md` exists with non-empty content. If `init` produced nothing (rare — user aborted, or skill silently failed), fall back to `touch CLAUDE.md` so f.ii has a file to append to.
+
+**f.ii — Append the MCP database section.** Append the section below to `CLAUDE.md`. The heading is `## Local database` (no parenthetical) so the migration in f.iii produces the clean slug `local-database.md`.
+
+```bash
+SLUG="<from Step 7a>"  # e.g. myapp_project
+
+# Ensure existing file ends with a blank-line separator before appending.
+if [ -s CLAUDE.md ]; then
+  [ -n "$(tail -c 1 CLAUDE.md)" ] && printf '\n' >> CLAUDE.md
+  printf '\n' >> CLAUDE.md
+fi
+
+cat >> CLAUDE.md <<EOF
+## Local database
 
 This project is registered with the \`t3-local-pg\` MCP server as **\`$SLUG\`**. Pass this name as the \`project\` argument when calling \`query\`, \`query_write\`, \`describe\`, or \`list_projects\`.
 
@@ -644,12 +663,49 @@ The Postgres server runs on \`127.0.0.1:5432\` on the host machine and is **not 
 
 **Retry once if the MCP tools aren't visible at session start.** The \`mcp__plugin_create-t3-app-local_t3-local-pg__*\` tools sometimes aren't in the initial deferred-tool snapshot — they register a beat after the session prompt is composed and a follow-up system message surfaces them. If the tools aren't visible when a data question comes in, do **not** immediately declare the MCP server unavailable or walk the user through a misconfiguration diagnostic ("restart Cowork", "check \`brew services\`", "reinstall the plugin", etc.). Wait briefly and retry \`ToolSearch\` once. Only if the tools are *still* missing after a retry, frame it as a timing/registration issue and offer to retry again — don't lead with a misconfiguration diagnostic.
 EOF
-fi
 ```
 
-The `grep -qF` check makes this idempotent: re-running the skill on a project that already has the section leaves `CLAUDE.md` untouched. If the user manually rewrote the section with a different slug or edited the guidance (unusual — would only happen if they hand-edited the registry too), the skill respects their edit and does not overwrite it.
+**f.iii — Convert `CLAUDE.md` into a strict index (inline migration).** This substep is fully self-contained — no other skill is invoked. The end state is `CLAUDE.md` rewritten as a pure index, with one `.claude/topics/<slug>.md` file per `##` section in the source. Execute the steps below in order; they read the source `CLAUDE.md` (which currently contains f.i's `/init` output followed by f.ii's appended `## Local database` section), produce the topic files, then overwrite `CLAUDE.md` with the index template populated with entries.
 
-The new file (or appended section) is picked up by Step 8d's `git add .` along with everything else, so the pin lands in the same staged tree as the rest of the scaffold.
+1. **Create `.claude/topics/`** at the project root if it does not already exist. Do not modify or delete any files already in it.
+
+2. **Parse `CLAUDE.md` into sections.** Treat each `##` heading as a topic boundary. Content above the first `##` is the **preamble**. Content under each `##` (including any nested `###`+ subheadings) belongs to that topic until the next `##`. Do not split on `###` or deeper headings — those stay nested inside their parent `##`.
+
+3. **Classify each `##` section** by counting non-blank, non-heading lines in its body:
+   - **Substantive** (~5+ lines) → gets its own topic file.
+   - **Stub** (<5 lines) → collected into a single `misc.md`.
+   
+   For the preamble: if it reads as rules or instructions for Claude (do/don'ts, persona conventions), preserve it under `### Preamble (preserved)` inside `misc.md`. Otherwise treat it as a stub and put it in `misc.md`.
+
+4. **Generate slugs** for each substantive topic from the heading text:
+   1. Lowercase.
+   2. Replace any whitespace or punctuation run with a single `-`.
+   3. Trim leading and trailing `-`.
+   4. If empty, use `topic-<n>` where `<n>` is the 1-indexed position of the topic.
+   5. If the slug collides with one already chosen this run, append `-2`, `-3`, etc.
+   
+   Slugs are kebab-case: lowercase letters, digits, hyphens only. Expected slugs for the typical `/init` + MCP-appended source: `architecture`, `build-commands` (or similar), `local-database`, `project-overview`, etc.
+
+5. **Write each substantive topic file** at `.claude/topics/<slug>.md`:
+   - **Line 1:** a one-line hook describing the topic — ≤150 chars, surfaces the keywords a future reader (human or LLM) would search for. Be specific to the file's scope. For `local-database.md` the hook should clearly include keywords like *MCP*, *project*, *query*, *describe*, *t3-local-pg* so data-related questions in future sessions route through the right topic.
+   - **Line 2:** blank.
+   - **Lines 3+:** the original section body. Drop the `##` heading line itself (the file's purpose is captured in the hook). Keep all `###` and deeper subheadings as-is.
+
+6. **Write stubs** into a single `.claude/topics/misc.md`. Each stub appears under its original heading **demoted from `##` to `###`** so it nests cleanly under the file's structure. The preserved-preamble subheading (if any) stays at `###`. Skip this file entirely if there are no stubs and no preserved preamble.
+
+7. **Generate index entries.** One line per topic file:
+   
+   ```
+   - [<slug>](.claude/topics/<slug>.md) — <hook>
+   ```
+   
+   The `<hook>` is the same line 1 hook from each topic file. Sort entries alphabetically by slug.
+
+8. **Rewrite `CLAUDE.md`** from the template at `references/claude-md-template.md` (next to this SKILL.md). Read the template, replace the marker line `<!-- INDEX_ENTRIES -->` with the joined entries (one per line, no extra blank lines between entries), and write the result to `CLAUDE.md` at the project root, replacing the existing file. The template ships the rules-for-Claude block, the index entry format spec, the filename conventions, and the maintenance rules — these become the static prelude above the populated index.
+
+After step 8 finishes, `CLAUDE.md` is no longer a long inline document. Architecture context and MCP usage both live in `.claude/topics/`, indexed from the root file. The `local-database.md` file's existence is what substep **f**'s idempotency check at the top reads on re-runs.
+
+The new files (`CLAUDE.md` and everything under `.claude/topics/`) are picked up by Step 8d's `git add .` along with the rest of the scaffold.
 
 ### 8. Verify the stack
 
@@ -725,7 +781,7 @@ After every preceding step succeeded, print exactly the block below — verbatim
 - `npm run dev` — start the dev server (Postgres runs in the background as a system service)
 - `npm run db:push` — apply schema changes after editing `src/server/db/schema.ts`
 - Database registry: `~/.t3-local-pg/registry.json` (project name → DB connection URLs)
-- MCP server: `t3-local-pg` is registered with Claude Desktop / Cowork. Use the `query`, `query_write`, `describe`, and `list_projects` tools to inspect this project's DB. The project name is pinned in `CLAUDE.md` so any Claude session opened here resolves it automatically.
+- MCP server: `t3-local-pg` is registered with Claude Desktop / Cowork. Use the `query`, `query_write`, `describe`, and `list_projects` tools to inspect this project's DB. Project context lives in `CLAUDE.md` (a strict index) and `.claude/topics/*.md` — the MCP slug and usage rules are in `.claude/topics/local-database.md`, architecture and build notes are in their own topic files. Any Claude session opened here resolves the project automatically via the index.
 ```
 
 If `npm run dev` bound to a non-3000 port during Step 8b, append exactly one line: `Dev server is on port <N> (something else was on :3000).`

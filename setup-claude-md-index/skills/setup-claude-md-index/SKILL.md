@@ -30,10 +30,12 @@ Create `.claude/topics/` at the project root if it does not already exist. Do no
 
 ### Step 3 — Fresh setup
 
-1. Read the template file `references/claude-md-template.md` from this skill's directory.
-2. Replace the marker line `<!-- INDEX_ENTRIES -->` with a single empty line — the index starts empty and is populated as topics are added later.
-3. Write the result to `CLAUDE.md` at the project root.
-4. Skip to Step 5 (confirmation).
+The goal is to populate `CLAUDE.md` with real, codebase-derived content via the built-in `/init` command, then convert that content into the indexed structure. Do **not** stamp an empty index — `/init` does the analysis, and migration converts its output.
+
+1. Invoke the built-in `init` skill via the Skill tool (`{"skill": "init"}`). This runs the same logic as the user typing `/init` — Claude analyzes the repository and writes a populated `CLAUDE.md` at the project root.
+2. Wait for the `init` skill to finish and verify `CLAUDE.md` now exists with non-empty content.
+3. If `init` produced no `CLAUDE.md` (rare — e.g. user aborted), fall back to writing the empty-index template: read `references/claude-md-template.md`, replace `<!-- INDEX_ENTRIES -->` with a single empty line, write to `CLAUDE.md`, then skip to Step 5.
+4. Otherwise, proceed to Step 4 (migration setup) with the `init`-generated `CLAUDE.md` as input. Migration will extract its `##` sections into topic files and rewrite `CLAUDE.md` as a strict index. The template's rules, format spec, filename conventions, and maintenance rules are added by the migration's rewrite step (4f).
 
 ### Step 4 — Migration setup
 
@@ -104,6 +106,7 @@ Always end with a summary to the user. Never run silently. Include:
 
 - Path to the new `CLAUDE.md`.
 - Path to `.claude/topics/`.
+- (Fresh setup) note that `/init` was run first to populate the source content, then migration converted it.
 - (Migration only) the number of substantive topics extracted, whether `misc.md` was created, and the full list of topic file paths written.
 - A one-line reminder that future project context should go in topic files, not in `CLAUDE.md` itself.
 
