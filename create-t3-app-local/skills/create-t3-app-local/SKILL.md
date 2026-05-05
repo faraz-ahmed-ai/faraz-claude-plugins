@@ -597,9 +597,9 @@ NODESCRIPT
 
 After this step the MCP server's next call (Claude Desktop / Cowork) will see the new project — the server reads the registry on every tool invocation.
 
-**f. Pin the project name in `CLAUDE.md`.**
+**f. Pin the project name in `CLAUDE.md` and route data questions through the MCP server.**
 
-The MCP server requires an explicit `project` argument on every tool call — it does not infer the project from the working directory. Writing the slug into the project's `CLAUDE.md` lets any Claude session opened in this repo resolve the right project name automatically, without a preliminary `list_projects` lookup and without ambiguity when more than one T3 app is registered.
+The MCP server requires an explicit `project` argument on every tool call — it does not infer the project from the working directory. Pinning the slug in `CLAUDE.md` lets any Claude session opened in this repo resolve the right project name automatically, without a preliminary `list_projects` lookup and without ambiguity when more than one T3 app is registered. The same section also carries explicit guidance that any data-shaped question (row values, counts, schema lookups) must go through the MCP tools rather than through code-reading or shell `psql` calls — the host's Postgres on `127.0.0.1:5432` is not reachable from sandboxed bash environments (Cowork, Claude Code), so the MCP server is the only path.
 
 ```bash
 CLAUDE_MD="CLAUDE.md"
@@ -615,11 +615,20 @@ if ! { [ -f "$CLAUDE_MD" ] && grep -qF "$PIN_MARKER" "$CLAUDE_MD"; }; then
 $PIN_MARKER
 
 This project is registered with the \`t3-local-pg\` MCP server as **\`$SLUG\`**. Pass this name as the \`project\` argument when calling \`query\`, \`query_write\`, \`describe\`, or \`list_projects\`.
+
+**When to use the MCP server.** Any natural-language question about the project's *data* — what's in a table, what value a row has, how many records match a condition, what the schema looks like — must be answered by calling a \`t3-local-pg\` MCP tool, not by reading source code, guessing from \`schema.ts\`, or asking the user to run SQL themselves. Concretely:
+
+- "What's the value of X?" / "What rows match Y?" / "How many Zs are there?" → \`query\` (read-only).
+- "What tables exist?" / "What columns does table X have?" → \`describe\`.
+- "What projects are registered?" → \`list_projects\`.
+- "Insert / update / delete this record" — only when the user has clearly asked for a mutation → \`query_write\`.
+
+The Postgres server runs on \`127.0.0.1:5432\` on the host machine and is **not reachable from any sandboxed bash environment** (Cowork's bash, Claude Code's sandbox, etc.). The MCP server is the only path. Do not try to work around it with \`psql\` shell calls, network requests, or by inferring values from the codebase — call the tool.
 EOF
 fi
 ```
 
-The `grep -qF` check makes this idempotent: re-running the skill on a project that already has the section leaves `CLAUDE.md` untouched. If the user manually rewrote the section with a different slug (unusual — would only happen if they hand-edited the registry too), the skill respects their edit and does not overwrite it.
+The `grep -qF` check makes this idempotent: re-running the skill on a project that already has the section leaves `CLAUDE.md` untouched. If the user manually rewrote the section with a different slug or edited the guidance (unusual — would only happen if they hand-edited the registry too), the skill respects their edit and does not overwrite it.
 
 The new file (or appended section) is picked up by Step 8d's `git add .` along with everything else, so the pin lands in the same staged tree as the rest of the scaffold.
 
@@ -725,7 +734,9 @@ A success line is a load-bearing claim. Only print `<component> bootstrapped/sca
   - Server resources (RAM/CPU/disk), the bootstrap superuser, cluster-level config (`pg_hba.conf`, extensions). Acceptable for dev.
   - The cluster's built-in `postgres` admin DB. Postgres ships with `PUBLIC` having `CONNECT` on `postgres`, and the skill does not revoke it — many tools (psql by default, GUI clients, monitoring agents) connect there first to discover other databases. Any project role can therefore open a session on `postgres`. The DB is empty by default and the role has no `SELECT` grants on its system catalogs that contain anything sensitive, so this is mostly cosmetic. If you want a stricter posture, run `psql "$SUPERUSER_URL" -c 'REVOKE CONNECT ON DATABASE postgres FROM PUBLIC'` — but expect breakage in tools that assume the admin DB is always reachable.
 
-**How the MCP server is registered.** The plugin's `.mcp.json` at the plugin root declares `t3-local-pg` with `command: "node"` and `args: ["${CLAUDE_PLUGIN_ROOT}/mcp-server/server.js"]`. Claude Code, Claude Desktop, and Cowork all load plugin-shipped MCP servers from the plugin's installed location (no manual config editing required), so the path stays valid wherever the plugin cache lives. Runtime dependencies (`pg`, `@modelcontextprotocol/sdk`) install lazily into `${CLAUDE_PLUGIN_DATA}/node_modules` via a `SessionStart` hook that diffs the source `package.json` against the cached one and re-runs `npm install` only when the plugin version changes. The MCP server reads `~/.t3-local-pg/registry.json` at every tool call, so it sees new projects as soon as Step 7 of this skill writes them.
+**How the MCP server is registered.** The plugin's `.mcp.json` at the plugin root declares `t3-local-pg` with `command: "node"` and `args: ["${CLAUDE_PLUGIN_DATA}/server.js"]`. Claude Code, Claude Desktop, and Cowork all load plugin-shipped MCP servers from this declaration — no manual config editing required. A `SessionStart` hook in `plugin.json` runs `mcp-server/install.sh` on every session, which copies `server.js` and `package.json` from the plugin root into `${CLAUDE_PLUGIN_DATA}` and runs `npm install` there (both copies are diff-gated, so re-runs are no-ops). The MCP server reads `~/.t3-local-pg/registry.json` at every tool call, so it sees new projects as soon as Step 7 of this skill writes them.
+
+**Why we copy `server.js` into `${CLAUDE_PLUGIN_DATA}` instead of running it from `${CLAUDE_PLUGIN_ROOT}`.** The MCP server is ESM (`"type": "module"`). Node's ESM resolver ignores `NODE_PATH` and only walks up from the importing file looking for `node_modules` — so a server at `${CLAUDE_PLUGIN_ROOT}/mcp-server/server.js` cannot import packages from `${CLAUDE_PLUGIN_DATA}/node_modules` no matter how `NODE_PATH` is set. Co-locating `server.js` next to its `node_modules` (both inside `${CLAUDE_PLUGIN_DATA}`) is the only resolution path that works without a custom loader. Plugin root stays read-only as the spec intends.
 
 **Why we don't edit `claude_desktop_config.json` anymore.** Older versions of this skill patched `~/Library/Application Support/Claude/claude_desktop_config.json` to add the `mcpServers` entry. That worked briefly but did not persist: Claude Desktop owns that file as a preferences store and rewrites it on its own schedule, dropping top-level keys it doesn't recognize. Plugin-shipped MCPs are the canonical mechanism (see [GitHub issue #16143](https://github.com/anthropics/claude-code/issues/16143) for the discussion that pinned this down).
 

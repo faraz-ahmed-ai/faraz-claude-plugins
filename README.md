@@ -67,6 +67,7 @@ See [`setup-claude-md-index/README.md`](./setup-claude-md-index/README.md) for d
 │   ├── .mcp.json                     # MCP server registration
 │   ├── README.md                     # plugin docs
 │   ├── mcp-server/                   # the project-aware MCP server itself
+│   │   ├── install.sh                # SessionStart hook script (copies into CLAUDE_PLUGIN_DATA)
 │   │   ├── package.json
 │   │   └── server.js
 │   └── skills/

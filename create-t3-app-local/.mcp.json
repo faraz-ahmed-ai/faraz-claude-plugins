@@ -2,10 +2,7 @@
   "mcpServers": {
     "t3-local-pg": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-server/server.js"],
-      "env": {
-        "NODE_PATH": "${CLAUDE_PLUGIN_DATA}/node_modules"
-      }
+      "args": ["${CLAUDE_PLUGIN_DATA}/server.js"]
     }
   }
 }

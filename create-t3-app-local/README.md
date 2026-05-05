@@ -102,6 +102,7 @@ create-t3-app-local/
 ├── .mcp.json                  # MCP server registration (auto-loaded by Claude Desktop / Cowork)
 ├── README.md                  # this file
 ├── mcp-server/                # the project-aware MCP server itself
+│   ├── install.sh             # SessionStart hook script (copies server into CLAUDE_PLUGIN_DATA)
 │   ├── package.json
 │   └── server.js
 └── skills/
@@ -111,4 +112,4 @@ create-t3-app-local/
 
 The full procedure (every edge case the skill handles internally — dotfile stash, ERESOLVE iterations, port-detection fallback, registry collision suffixing, idempotent re-runs) lives in [`skills/create-t3-app-local/SKILL.md`](./skills/create-t3-app-local/SKILL.md).
 
-The MCP server is shipped as part of the plugin and registered via [`.mcp.json`](./.mcp.json) — when the plugin is installed, Claude Desktop / Cowork loads it from `${CLAUDE_PLUGIN_ROOT}/mcp-server/server.js` automatically. Runtime dependencies install on first session start via the plugin manifest's `SessionStart` hook. See [`mcp-server/server.js`](./mcp-server/server.js) for the tool implementations.
+The MCP server is shipped as part of the plugin and registered via [`.mcp.json`](./.mcp.json). On every session start, [`mcp-server/install.sh`](./mcp-server/install.sh) (called from the plugin manifest's `SessionStart` hook) copies `server.js` and `package.json` from the plugin root into `${CLAUDE_PLUGIN_DATA}` and runs `npm install` there — `.mcp.json` then points Claude Desktop / Cowork at `${CLAUDE_PLUGIN_DATA}/server.js`. We have to colocate the server with its `node_modules` because Node's ESM resolver ignores `NODE_PATH`; both copies are diff-gated, so re-runs are no-ops. See [`mcp-server/server.js`](./mcp-server/server.js) for the tool implementations.
