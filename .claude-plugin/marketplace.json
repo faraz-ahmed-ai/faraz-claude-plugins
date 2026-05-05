@@ -12,7 +12,7 @@
     {
       "name": "create-t3-app-local",
       "source": "./create-t3-app-local",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "description": "Zero-input local install of an opinionated T3 stack (Next.js App Router, TypeScript, Tailwind, tRPC, Drizzle, better-auth) wired to a shared local Postgres (Homebrew postgresql@16) with per-project isolated databases and least-privilege roles. Ships a project-aware MCP server (auto-registered via the plugin manifest) so Claude Desktop and Cowork can query each project's DB. No manual prompts — runs end-to-end on macOS or Linux."
     },
     {

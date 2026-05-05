@@ -15,7 +15,7 @@ A working [create-t3-app](https://create.t3.gg/) project pre-configured with:
 - **ESLint + Prettier**
 - **A per-project Postgres database** (`<slug>_dev`) inside a shared Homebrew `postgresql@16` cluster — auto-started on login via `brew services` (launchd on macOS, systemd-user on Linux). Each project gets its own database and its own least-privilege roles, so projects can't read or corrupt each other's data.
 - **A `t3-local-pg` MCP server**, registered with Claude Desktop and Cowork, exposing `query`, `query_write`, `describe`, and `list_projects` tools so Claude can inspect each project's database directly. The current project's slug is auto-pinned via the strict-index `CLAUDE.md` (see next bullet) so any session opened in the repo resolves to the right database without a lookup.
-- **An indexed `CLAUDE.md`.** As the final scaffold step, the skill runs the built-in `/init` to populate `CLAUDE.md` with codebase-derived architecture context, appends the MCP database section, then runs an inline migration that converts the result into a strict index pointing to per-topic detail files in `.claude/topics/` (`local-database.md` for MCP usage, plus topic files for architecture, build/test commands, etc.). Future Claude sessions opening the repo see the index, follow the entries, and load only the topic files they need. The migration is fully self-contained — no dependency on other plugins.
+- **An indexed `CLAUDE.md`.** As the final scaffold step, the skill runs the built-in `/init` to populate `CLAUDE.md` with codebase-derived architecture context, then runs a bundled Node script (`bootstrap-claude-md.js`) that appends the MCP database section and converts the result into a strict index pointing to per-topic detail files in `.claude/topics/` (`local-database.md` for MCP usage, plus topic files for architecture, build/test commands, etc.). Future Claude sessions opening the repo see the index, follow the entries, and load only the topic files they need. The script uses Node built-ins only and ships with the plugin — no external dependency, no other plugin required.
 
 …and the standard create-t3-app scripts. The two you'll use most:
 
@@ -109,8 +109,10 @@ create-t3-app-local/
 └── skills/
     └── create-t3-app-local/
         ├── SKILL.md           # the skill itself — full procedure, edge cases, recovery
-        └── references/
-            └── claude-md-template.md  # template for the indexed CLAUDE.md (used by substep 7f.iii)
+        ├── references/
+        │   └── claude-md-template.md   # template for the indexed CLAUDE.md
+        └── scripts/
+            └── bootstrap-claude-md.js  # appends MCP section + converts CLAUDE.md to indexed structure
 ```
 
 The full procedure (every edge case the skill handles internally — dotfile stash, ERESOLVE iterations, port-detection fallback, registry collision suffixing, idempotent re-runs) lives in [`skills/create-t3-app-local/SKILL.md`](./skills/create-t3-app-local/SKILL.md).
