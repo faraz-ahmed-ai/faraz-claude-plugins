@@ -624,6 +624,8 @@ This project is registered with the \`t3-local-pg\` MCP server as **\`$SLUG\`**.
 - "Insert / update / delete this record" — only when the user has clearly asked for a mutation → \`query_write\`.
 
 The Postgres server runs on \`127.0.0.1:5432\` on the host machine and is **not reachable from any sandboxed bash environment** (Cowork's bash, Claude Code's sandbox, etc.). The MCP server is the only path. Do not try to work around it with \`psql\` shell calls, network requests, or by inferring values from the codebase — call the tool.
+
+**Retry once if the MCP tools aren't visible at session start.** The \`mcp__plugin_create-t3-app-local_t3-local-pg__*\` tools sometimes aren't in the initial deferred-tool snapshot — they register a beat after the session prompt is composed and a follow-up system message surfaces them. If the tools aren't visible when a data question comes in, do **not** immediately declare the MCP server unavailable or walk the user through a misconfiguration diagnostic ("restart Cowork", "check \`brew services\`", "reinstall the plugin", etc.). Wait briefly and retry \`ToolSearch\` once. Only if the tools are *still* missing after a retry, frame it as a timing/registration issue and offer to retry again — don't lead with a misconfiguration diagnostic.
 EOF
 fi
 ```
