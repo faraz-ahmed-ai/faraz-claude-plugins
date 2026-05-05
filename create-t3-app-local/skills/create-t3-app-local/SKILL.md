@@ -379,7 +379,7 @@ Expect **up to two bump iterations** for the current better-auth/drizzle peer la
 
 ### 6. Apply post-scaffold fixes
 
-These three edits make the generated project usable without further manual steps. Apply all three.
+These edits make the generated project usable without further manual steps. Apply all of them.
 
 **a. Make GitHub OAuth env vars optional** — `src/env.js`
 
@@ -442,6 +442,23 @@ fi
 Why `[ -n "$(tail -c 1 .gitignore)" ]`: command substitution strips trailing newlines, so the value is empty exactly when the file already ends with `\n`. Empty → no extra newline needed; non-empty → newline needed before append.
 
 There is no PGlite data directory to ignore — the database lives in the shared Postgres cluster's data dir, not in the project.
+
+**e. Remove the Drizzle Studio dev-server script** — `package.json`
+
+Delete the `db:studio` script if create-t3-app generated one. We want `npm run dev` (Next.js) to be the only dev-server entry point in this project — `drizzle-kit studio` is a separate web UI that confuses the "what do I run to start the app?" question, and the MCP server already covers ad-hoc DB inspection via `query`/`describe`.
+
+```bash
+node <<'NODESCRIPT'
+const fs = require("fs");
+const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+if (pkg.scripts && "db:studio" in pkg.scripts) {
+  delete pkg.scripts["db:studio"];
+  fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+}
+NODESCRIPT
+```
+
+Idempotent: re-running on a project where the script is already gone is a no-op (the `in` check skips the delete and the file isn't rewritten). Keep `db:push`, `db:generate`, and `db:migrate` — those are non-server schema-management commands and remain useful.
 
 ### 7. Provision the project's database and write `.env`
 
