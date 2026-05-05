@@ -1,10 +1,22 @@
 {
   "name": "create-t3-app-local",
-  "version": "1.0.0",
-  "description": "Zero-input local install of an opinionated T3 stack (Next.js App Router, TypeScript, Tailwind, tRPC, Drizzle, better-auth) wired to a shared local Postgres (Homebrew postgresql@16) with per-project isolated databases and least-privilege roles. Registers a project-aware MCP server so Claude Desktop and Cowork can query each project's DB. Runs end-to-end on macOS or Linux.",
+  "version": "1.1.0",
+  "description": "Zero-input local install of an opinionated T3 stack (Next.js App Router, TypeScript, Tailwind, tRPC, Drizzle, better-auth) wired to a shared local Postgres (Homebrew postgresql@16) with per-project isolated databases and least-privilege roles. Ships a project-aware MCP server (auto-registered via the plugin manifest) so Claude Desktop and Cowork can query each project's DB. Runs end-to-end on macOS or Linux.",
   "author": {
     "name": "Faraz",
     "email": "faraz@pocketpulse.io"
   },
-  "skills": ["./skills/create-t3-app-local"]
+  "skills": ["./skills/create-t3-app-local"],
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "diff -q \"${CLAUDE_PLUGIN_ROOT}/mcp-server/package.json\" \"${CLAUDE_PLUGIN_DATA}/package.json\" >/dev/null 2>&1 || (mkdir -p \"${CLAUDE_PLUGIN_DATA}\" && cd \"${CLAUDE_PLUGIN_DATA}\" && cp \"${CLAUDE_PLUGIN_ROOT}/mcp-server/package.json\" . && npm install --silent)"
+          }
+        ]
+      }
+    ]
+  }
 }

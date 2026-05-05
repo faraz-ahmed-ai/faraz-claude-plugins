@@ -1,6 +1,6 @@
 ---
 name: create-t3-app-local
-description: Scaffold a fresh T3 stack project (Next.js App Router + TypeScript + Tailwind + tRPC + Drizzle + better-auth) wired to a shared local Postgres (Homebrew postgresql@16, auto-started by the OS service manager) with a per-project isolated database, and register a project-aware MCP server so Claude Desktop and Cowork can query the local databases. Works on macOS and Linux. Takes no arguments — fully ready to go. Trigger this whenever the user asks to set up, scaffold, bootstrap, or initialize a new T3 app, T3 stack, or create-t3-app project — including phrasings like "start a new t3 project", "spin up a t3 stack", or "/create-t3-app".
+description: Scaffold a fresh T3 stack project (Next.js App Router + TypeScript + Tailwind + tRPC + Drizzle + better-auth) wired to a shared local Postgres (Homebrew postgresql@16, auto-started by the OS service manager) with a per-project isolated database. Each scaffolded project is registered with the plugin's t3-local-pg MCP server (loaded automatically by Claude Desktop and Cowork via the plugin manifest) so Claude can query its database. Works on macOS and Linux. Takes no arguments — fully ready to go. Trigger this whenever the user asks to set up, scaffold, bootstrap, or initialize a new T3 app, T3 stack, or create-t3-app project — including phrasings like "start a new t3 project", "spin up a t3 stack", or "/create-t3-app".
 ---
 
 # create-t3-app-local
@@ -137,14 +137,14 @@ If any verification fails, stop and surface the actual error rather than continu
 
 **Note on macOS Git:** macOS may ship a Git stub at `/usr/bin/git` that triggers an Xcode Command Line Tools installer dialog when first invoked. `command -v git` returns true for the stub even before CLT is installed. The Homebrew-installed Git takes precedence on PATH and avoids the CLT dialog entirely.
 
-### 2. Bootstrap the shared local Postgres + MCP server (idempotent)
+### 2. Bootstrap the shared local Postgres (idempotent)
 
 This step ensures the machine has:
 - `postgresql@16` installed via Homebrew
 - The Postgres service running and registered with the OS service manager (launchd on macOS, systemd-user on Linux) so it auto-starts on login
-- A registry directory at `~/.t3-local-pg/`
-- The project-aware MCP server installed at `~/.t3-local-pg/mcp/`
-- An entry in Claude Desktop / Cowork's MCP config
+- A registry directory at `~/.t3-local-pg/` for the per-project DB credentials read by the MCP server
+
+The MCP server itself ships with the plugin and is registered with Claude Desktop / Cowork via the plugin's `.mcp.json` manifest — this skill does **not** install the MCP server or edit any Claude Desktop config. A `SessionStart` hook in `plugin.json` lazily installs the MCP server's runtime dependencies into `${CLAUDE_PLUGIN_DATA}/node_modules` the first time a session loads the plugin (and after every plugin version bump).
 
 Every substep self-checks; running this step on a machine where everything is already configured is a no-op (and the `Postgres bootstrapped` line is suppressed in that case — see Output style).
 
@@ -259,89 +259,19 @@ fi
 
 If you tighten this for a multi-user machine, replace the local-trust line in `$PG_DATA/pg_hba.conf` with `scram-sha-256` and store the password in `superuser.env`. The skill does not do this automatically because it would prompt for a password the user hasn't set yet.
 
-**g. Install or update the MCP server.**
+**g. Decide whether to print `Postgres bootstrapped`.**
 
-The canonical source lives in this plugin's `mcp-server/` directory (`package.json` + `server.js`). The bootstrap copies them into `~/.t3-local-pg/mcp/` and runs `npm install` once. Re-copy + reinstall only when the source `package.json` `version` differs from the installed one.
+If `BOOTSTRAP_CHANGED=1` was ever set during substeps (a)–(f), print the success line. Otherwise stay silent — the bootstrap was a no-op, the user shouldn't see a line implying work was done.
 
-Use the Read tool to read the plugin's `mcp-server/package.json` and `mcp-server/server.js`, then check the version against `~/.t3-local-pg/mcp/package.json`:
+**Why this whole step is idempotent and re-runs safely:** Each substep is a check-then-act. Re-invoking the skill on a fully-set-up machine touches nothing: brew sees postgresql@16 installed, the data dir is initialized, the service is started (or the manual `pg_ctl` is still running), the registry dir exists with proper modes. Only when something is genuinely missing does work happen.
 
-```bash
-mkdir -p ~/.t3-local-pg/mcp
-
-# Read installed version (empty if not yet installed).
-INSTALLED_VERSION=""
-if [ -f ~/.t3-local-pg/mcp/package.json ]; then
-  INSTALLED_VERSION=$(node -p "require('$HOME/.t3-local-pg/mcp/package.json').version" 2>/dev/null || echo "")
-fi
-echo "INSTALLED_VERSION=$INSTALLED_VERSION"
-```
-
-If the source version differs from `INSTALLED_VERSION` (or installed version is empty), Write the source `package.json` and `server.js` into `~/.t3-local-pg/mcp/`, then run `npm install` in that directory:
+**One-time cleanup of the legacy install location.** Earlier versions of this skill copied the MCP server to `~/.t3-local-pg/mcp/` and patched `claude_desktop_config.json` directly. Both are obsolete now (the plugin manifest handles registration, and Claude Desktop overwrote the JSON edits anyway). If `~/.t3-local-pg/mcp/` exists from a prior run, remove it silently:
 
 ```bash
-cd ~/.t3-local-pg/mcp && npm install --omit=dev
-chmod 600 ~/.t3-local-pg/mcp/package.json ~/.t3-local-pg/mcp/server.js
-chmod +x ~/.t3-local-pg/mcp/server.js
-BOOTSTRAP_CHANGED=1
+[ -d ~/.t3-local-pg/mcp ] && rm -rf ~/.t3-local-pg/mcp
 ```
 
-Run `npm install` from `~/.t3-local-pg/mcp/`, not from the project's working directory. The MCP install must not pollute the project's `node_modules` or lockfile.
-
-**h. Patch the MCP client's config.**
-
-The config file path differs by platform:
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json` (Claude Desktop and Cowork share this file).
-- **Linux**: `~/.config/Claude/claude_desktop_config.json` (XDG-style location; Cowork on Linux reads from here. Claude Desktop is not officially supported on Linux at the time of writing).
-
-Patch it via Node so JSON formatting stays valid; back up the original on every change. The Node script picks the platform's path itself:
-
-```bash
-node <<'NODESCRIPT'
-const fs = require("fs");
-const os = require("os");
-const path = require("path");
-
-const cfg = process.platform === "darwin"
-  ? path.join(os.homedir(), "Library/Application Support/Claude/claude_desktop_config.json")
-  : path.join(os.homedir(), ".config/Claude/claude_desktop_config.json");
-fs.mkdirSync(path.dirname(cfg), { recursive: true });
-
-let data = {};
-if (fs.existsSync(cfg)) {
-  data = JSON.parse(fs.readFileSync(cfg, "utf8"));
-}
-data.mcpServers = data.mcpServers || {};
-
-const desired = {
-  command: "node",
-  args: [path.join(os.homedir(), ".t3-local-pg/mcp/server.js")],
-};
-
-const existing = data.mcpServers["t3-local-pg"];
-if (JSON.stringify(existing) === JSON.stringify(desired)) {
-  console.log("CLAUDE_CONFIG_UNCHANGED");
-  process.exit(0);
-}
-
-if (fs.existsSync(cfg)) {
-  const stamp = new Date().toISOString().slice(0, 10);
-  fs.copyFileSync(cfg, cfg + ".bak-" + stamp);
-}
-data.mcpServers["t3-local-pg"] = desired;
-fs.writeFileSync(cfg, JSON.stringify(data, null, 2) + "\n");
-console.log("CLAUDE_CONFIG_PATCHED");
-NODESCRIPT
-```
-
-If output is `CLAUDE_CONFIG_PATCHED`, set `BOOTSTRAP_CHANGED=1`. If the user has Claude Desktop / Cowork open, they'll need to restart it to pick up the new server — note this in the final report only if the config was actually patched on this run.
-
-The Linux path is best-effort: writing to `~/.config/Claude/...` is harmless if no client reads it, and matches Cowork's expected location. If the user's MCP client uses a different path, surface the registry location (`~/.t3-local-pg/mcp/server.js`) and let them register manually.
-
-**i. Decide whether to print `Postgres bootstrapped`.**
-
-If `BOOTSTRAP_CHANGED=1` was ever set during substeps (a)–(h), print the success line. Otherwise stay silent — the bootstrap was a no-op, the user shouldn't see a line implying work was done.
-
-**Why this whole step is idempotent and re-runs safely:** Each substep is a check-then-act. Re-invoking the skill on a fully-set-up machine touches nothing: brew sees postgresql@16 installed, the data dir is initialized, the service is started (or the manual `pg_ctl` is still running), the registry dir exists with proper modes, the MCP version matches, the MCP config has the right entry. Only when something is genuinely missing does work happen.
+Don't print anything for this — it's invisible cleanup, not a reportable event.
 
 ### 3. Determine project name
 
@@ -772,8 +702,6 @@ After every preceding step succeeded, print exactly the block below — verbatim
 
 If `npm run dev` bound to a non-3000 port during Step 8b, append exactly one line: `Dev server is on port <N> (something else was on :3000).`
 
-If Step 2h actually patched `claude_desktop_config.json` on this run (output was `CLAUDE_CONFIG_PATCHED`, not `CLAUDE_CONFIG_UNCHANGED`), append: `Restart Claude Desktop / Cowork to load the t3-local-pg MCP server.` Otherwise omit.
-
 If `SERVICE_PERSISTENCE_WARNING=1` was set during Step 2d (Linux without systemd, fell back to `pg_ctl`), append: `Postgres started via pg_ctl — no systemd available, so it will NOT auto-restart on reboot. Run `pg_ctl -D $(brew --prefix postgresql@16)/var/postgresql@16 start` after each reboot, or set up a systemd-user service yourself.` Otherwise omit.
 
 If on Linux with systemd and the user has not enabled lingering for their account, append: `Run \`loginctl enable-linger $(whoami)\` once to keep Postgres running across logout (otherwise it stops when you log out).` Detect this by running `loginctl show-user $(whoami) -p Linger 2>/dev/null | grep -q 'Linger=yes'` — append the line only if the check fails. Skip the line entirely on macOS.
@@ -797,7 +725,9 @@ A success line is a load-bearing claim. Only print `<component> bootstrapped/sca
   - Server resources (RAM/CPU/disk), the bootstrap superuser, cluster-level config (`pg_hba.conf`, extensions). Acceptable for dev.
   - The cluster's built-in `postgres` admin DB. Postgres ships with `PUBLIC` having `CONNECT` on `postgres`, and the skill does not revoke it — many tools (psql by default, GUI clients, monitoring agents) connect there first to discover other databases. Any project role can therefore open a session on `postgres`. The DB is empty by default and the role has no `SELECT` grants on its system catalogs that contain anything sensitive, so this is mostly cosmetic. If you want a stricter posture, run `psql "$SUPERUSER_URL" -c 'REVOKE CONNECT ON DATABASE postgres FROM PUBLIC'` — but expect breakage in tools that assume the admin DB is always reachable.
 
-**Why the MCP server lives at `~/.t3-local-pg/mcp/`.** Stable absolute path — Claude Desktop config needs an unchanging `args` path. Putting it in the plugin repo would break if the user moves or deletes the repo. The bootstrap copies the canonical source from the plugin's `mcp-server/` directory and pins the version; later skill runs re-copy only on version bump.
+**How the MCP server is registered.** The plugin's `.mcp.json` at the plugin root declares `t3-local-pg` with `command: "node"` and `args: ["${CLAUDE_PLUGIN_ROOT}/mcp-server/server.js"]`. Claude Code, Claude Desktop, and Cowork all load plugin-shipped MCP servers from the plugin's installed location (no manual config editing required), so the path stays valid wherever the plugin cache lives. Runtime dependencies (`pg`, `@modelcontextprotocol/sdk`) install lazily into `${CLAUDE_PLUGIN_DATA}/node_modules` via a `SessionStart` hook that diffs the source `package.json` against the cached one and re-runs `npm install` only when the plugin version changes. The MCP server reads `~/.t3-local-pg/registry.json` at every tool call, so it sees new projects as soon as Step 7 of this skill writes them.
+
+**Why we don't edit `claude_desktop_config.json` anymore.** Older versions of this skill patched `~/Library/Application Support/Claude/claude_desktop_config.json` to add the `mcpServers` entry. That worked briefly but did not persist: Claude Desktop owns that file as a preferences store and rewrites it on its own schedule, dropping top-level keys it doesn't recognize. Plugin-shipped MCPs are the canonical mechanism (see [GitHub issue #16143](https://github.com/anthropics/claude-code/issues/16143) for the discussion that pinned this down).
 
 **Why the MCP server uses `ro_url` by default.** The `query` tool uses the read-only role, so the most common Claude interaction (asking about data) cannot accidentally mutate. `query_write` exists for cases where the user has explicitly asked for a change, and uses the app role. The block is enforced at the Postgres permission layer, not by parsing SQL — verified by smoke-testing a `DELETE` through `query`, which returns `permission denied for table user`.
 

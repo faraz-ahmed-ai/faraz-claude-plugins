@@ -98,9 +98,10 @@ GitHub OAuth env vars (`BETTER_AUTH_GITHUB_CLIENT_ID`, `BETTER_AUTH_GITHUB_CLIEN
 ```
 create-t3-app-local/
 ├── .claude-plugin/
-│   └── plugin.json            # plugin manifest
+│   └── plugin.json            # plugin manifest (incl. SessionStart hook for MCP deps)
+├── .mcp.json                  # MCP server registration (auto-loaded by Claude Desktop / Cowork)
 ├── README.md                  # this file
-├── mcp-server/                # source for the project-aware MCP server
+├── mcp-server/                # the project-aware MCP server itself
 │   ├── package.json
 │   └── server.js
 └── skills/
@@ -108,6 +109,6 @@ create-t3-app-local/
         └── SKILL.md           # the skill itself — full procedure, edge cases, recovery
 ```
 
-The full procedure (every edge case the skill handles internally — dotfile stash, ERESOLVE iterations, port-detection fallback, registry collision suffixing, Claude Desktop config patching, idempotent re-runs) lives in [`skills/create-t3-app-local/SKILL.md`](./skills/create-t3-app-local/SKILL.md).
+The full procedure (every edge case the skill handles internally — dotfile stash, ERESOLVE iterations, port-detection fallback, registry collision suffixing, idempotent re-runs) lives in [`skills/create-t3-app-local/SKILL.md`](./skills/create-t3-app-local/SKILL.md).
 
-The MCP server source is copied to `~/.t3-local-pg/mcp/` during the bootstrap step and registered in your Claude Desktop / Cowork config. See [`mcp-server/server.js`](./mcp-server/server.js) for the tool implementations.
+The MCP server is shipped as part of the plugin and registered via [`.mcp.json`](./.mcp.json) — when the plugin is installed, Claude Desktop / Cowork loads it from `${CLAUDE_PLUGIN_ROOT}/mcp-server/server.js` automatically. Runtime dependencies install on first session start via the plugin manifest's `SessionStart` hook. See [`mcp-server/server.js`](./mcp-server/server.js) for the tool implementations.
